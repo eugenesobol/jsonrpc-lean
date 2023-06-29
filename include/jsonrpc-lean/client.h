@@ -41,8 +41,8 @@ namespace jsonrpc {
             myId = id;
         }
 
-        std::shared_ptr<FormattedData> BuildRequestData(const std::string& methodName, const Request::Parameters& params = {}) {
-            return BuildRequestDataInternal(methodName, params);
+        std::shared_ptr<FormattedData> BuildRequestData(const std::string& methodName, const Request::Parameters& params = {}, const Request::NamedParams& namedParams = {}) {
+            return BuildRequestDataInternal(methodName, params, namedParams);
         }
 
         template<typename FirstType, typename... RestTypes>
@@ -54,8 +54,9 @@ namespace jsonrpc {
             return BuildRequestDataInternal(methodName, params, std::forward<RestTypes>(rest)...);
         }
 
-        std::shared_ptr<FormattedData> BuildNotificationData(const std::string& methodName, const Request::Parameters& params = {}) {
-            return BuildNotificationDataInternal(methodName, params);
+        std::shared_ptr<FormattedData> BuildNotificationData(const std::string& methodName, const Request::Parameters& params = {},
+            const Request::NamedParams& namedParams = {}) {
+            return BuildNotificationDataInternal(methodName, params, namedParams);
         }
 
         template<typename FirstType, typename... RestTypes>
@@ -117,7 +118,7 @@ namespace jsonrpc {
         }
 
         Response ParseResponseInternal(const std::string& aResponseData) {
-            auto reader = myFormatHandler.CreateReader(aResponseData);
+            auto reader = myFormatHandler.CreateReader(aResponseData, nullptr);
             Response response = reader->GetResponse();
             response.ThrowIfFault();
             return std::move(response);

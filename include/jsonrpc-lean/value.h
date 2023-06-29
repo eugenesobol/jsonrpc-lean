@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <vector>
 #include <ostream>
+#include <boost/optional.hpp>
 
 #include "util.h"
 #include "fault.h"
@@ -49,24 +50,18 @@ namespace jsonrpc {
 
         Value(bool value) : myType(Type::BOOLEAN) { as.myBoolean = value; }
 
-        Value(const DateTime& value)
-        : myType(Type::DATE_TIME)
-        , as{.myDateTime = new DateTime(value)}
-        {
+        Value(const DateTime& value) : myType(Type::DATE_TIME),
+            as{.myDateTime = new DateTime(value)} {
             as.myDateTime->tm_isdst = -1;
             optAs.myDateTime        = as.myDateTime;
         }
 
-        Value(int32_t value) : myType(Type::INTEGER_32) {
-            as.myInteger32 = value;
-            as.myInteger64 = value;
-            as.myDouble = value;
+        Value(double value) : myType(Type::DOUBLE),
+            as{.myDouble = value} {
+            optAs.myDouble = &as.myDouble;
         }
 
-        Value(int32_t value)
-        : myType(Type::INTEGER_32)
-        , as{.myInteger32 = value}
-        {
+        Value(int32_t value) : myType(Type::INTEGER_32), as{.myInteger32 = value} {
             as.myInteger64    = value;
             as.myDouble       = value;
             optAs.myInteger32 = &as.myInteger32;
@@ -202,6 +197,7 @@ namespace jsonrpc {
         bool IsArray() const { return myType == Type::ARRAY; }
         bool IsBinary() const { return myType == Type::BINARY; }
         bool IsBoolean() const { return myType == Type::BOOLEAN; }
+        bool IsDateTime() const { return myType == Type::DATE_TIME; }
         bool IsDouble() const { return myType == Type::DOUBLE; }
         bool IsInteger32() const { return myType == Type::INTEGER_32; }
         bool IsInteger64() const { return myType == Type::INTEGER_64; }

@@ -13,8 +13,10 @@
 #include "value.h"
 #include "jsonformatteddata.h"
 
+#if 0 /* disabled for compatability issues*/
 #define RAPIDJSON_NO_SIZETYPEDEFINE
 namespace rapidjson { typedef ::std::size_t SizeType; }
+#endif
 
 #include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>

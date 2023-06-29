@@ -16,8 +16,10 @@
 #include "value.h"
 #include "dispatcher.h"
 
+#if 0 /* disabled for compatability issues*/
 #define RAPIDJSON_NO_SIZETYPEDEFINE
 namespace rapidjson { typedef ::std::size_t SizeType; }
+#endif
 
 #include <rapidjson/document.h>
 #include <string>

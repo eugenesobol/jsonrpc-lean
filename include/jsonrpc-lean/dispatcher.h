@@ -11,6 +11,7 @@
 #include "request.h"
 #include "response.h"
 #include "value.h"
+#include "userFault.h"
 
 //#if __cplusplus <= 201103L
 #include "integer_seq.h"
@@ -23,11 +24,14 @@
 #include <functional>
 #include <utility>
 #include <vector>
+#include <Poco/Exception.h>
 
 namespace jsonrpc {
 
     class MethodWrapper {
     public:
+        using NamedParams = std::vector<std::string>;
+
         typedef std::function<Value(const Request::Parameters&)> Method;
 
         explicit MethodWrapper(Method method) : myMethod(method) {}

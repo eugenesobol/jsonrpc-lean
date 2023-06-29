@@ -24,7 +24,7 @@ namespace jsonrpc {
 
         virtual ~Reader() {}
 
-        virtual Request GetRequest() = 0;
+        virtual Request GetRequest(Value &id) = 0;
         virtual Response GetResponse() = 0;
         virtual Value GetValue() = 0;
     };

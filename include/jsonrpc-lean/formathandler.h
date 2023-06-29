@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <string>
+#include "reader.h"
 
 namespace jsonrpc {
 

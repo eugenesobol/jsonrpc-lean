@@ -40,7 +40,7 @@ namespace jsonrpc {
         virtual void EndResponse() = 0;
         virtual void StartFaultResponse(const Value& id) = 0;
         virtual void EndFaultResponse() = 0;
-        virtual void WriteFault(int32_t code, const std::string& string) = 0;
+        virtual void WriteFault(int32_t code, const std::string& string, const Value& data) = 0;
 
         // Values
         virtual void StartArray() = 0;
