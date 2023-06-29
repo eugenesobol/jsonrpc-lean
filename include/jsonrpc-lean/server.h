@@ -26,7 +26,9 @@ namespace jsonrpc {
 
     class Server {
     public:
-        Server() {}
+        Server() : getNamedParamsFunc(std::bind(&Server::getNamedParams, this, std::placeholders::_1))
+        {
+        }
         ~Server() {}
 
         Server(const Server&) = delete;
@@ -40,45 +42,103 @@ namespace jsonrpc {
 
         Dispatcher& GetDispatcher() { return myDispatcher; }
 
+        const Reader::NamedParams& getNamedParams(const std::string& methodName)
+        {
+            return GetDispatcher().GetMethod(methodName).GetNamedParams();
+        }
+
+        Request parse(const std::string& aRequestData,
+                    Value&             idOnFault,
+                    const std::string& aContentType = "application/json")
+        {
+            // first find the correct handler
+            auto fmtHandler = getFormatHandler(aContentType);
+
+            if (fmtHandler == nullptr)
+            {
+                // no FormatHandler able to handle this request type was found
+                throw InvalidRequestFault();
+            }
+
+            auto reader = fmtHandler->CreateReader(aRequestData, getNamedParamsFunc);
+            return reader->GetRequest(idOnFault);
+        }
+
         // aContentType is here to allow future implementation of other rpc formats with minimal code changes
         // Will return NULL if no FormatHandler is found, otherwise will return a FormatedData
         // If aRequestData is a Notification (the client doesn't expect a response), the returned FormattedData will have an empty ->GetData() buffer and ->GetSize() will be 0
         std::shared_ptr<jsonrpc::FormattedData> HandleRequest(const std::string& aRequestData, const std::string& aContentType = "application/json") {
 
-            // first find the correct handler
-            FormatHandler *fmtHandler = nullptr;
-            for (auto handler : myFormatHandlers) {
-                if (handler->CanHandleRequest(aContentType)) {
-                    fmtHandler = handler;
-                }
+            auto fmtHandler = getFormatHandler(aContentType);
+
+            if (nullptr == fmtHandler)
+            {
+                throw std::runtime_error("FormatHandler is NULL");
             }
 
-            if (fmtHandler == nullptr) {
-                // no FormatHandler able to handle this request type was found
-                return nullptr;
-            }
-            
             auto writer = fmtHandler->CreateWriter();
 
-            try {
-                auto reader = fmtHandler->CreateReader(aRequestData);
-                Request request = reader->GetRequest();
-                reader.reset();
+            Value id;
+            try
+            {
 
-                auto response = myDispatcher.Invoke(request.GetMethodName(), request.GetParameters(), request.GetId());
+                Request request    = parse(aRequestData, id, aContentType);
+                auto    parameters = request.GetParameters();
+                auto&   a          = parameters.front();
+                if (a.IsNil()) {
+                    parameters.pop_front();
+                }
+
+                int64_t intId = 0;
+                if (request.GetId().IsInteger32() or request.GetId().IsInteger64()) {
+                    intId = request.GetId().AsInteger64();
+                } else if (request.GetId().IsString()) {
+                    auto strId = request.GetId().AsString();
+
+                    try
+                    {
+                        intId = std::stoi(strId);
+                    }
+                    catch (...)
+                    {
+                    }
+                }
+                parameters.push_front(Value(intId));
+
+                auto response = myDispatcher.Invoke(request.GetMethodName(), parameters, request.GetId());
                 if (!response.GetId().IsBoolean() || response.GetId().AsBoolean() != false) {
                     // if Id is false, this is a notification and we don't have to write a response
                     response.Write(*writer);
                 }
             } catch (const Fault& ex) {
-                Response(ex.GetCode(), ex.GetString(), Value()).Write(*writer);
+                Response(ex.GetCode(), ex.GetString(), std::move(id)).Write(*writer);
             }
 
             return writer->GetData();
         }
     private:
+        FormatHandler* getFormatHandler(const std::string& aContentType = "application/json")
+        {
+
+            // first find the correct handler
+            for (auto handler : myFormatHandlers)
+            {
+
+                if (!handler)
+                    continue;
+
+                if (handler->CanHandleRequest(aContentType))
+                {
+                    return handler;
+                }
+            }
+
+            return nullptr;
+        }
+
         Dispatcher myDispatcher;
         std::vector<FormatHandler*> myFormatHandlers;
+        Reader::GetNamedParamsFunc  getNamedParamsFunc;
     };
 
 } // namespace jsonrpc

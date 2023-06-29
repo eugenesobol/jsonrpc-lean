@@ -27,11 +27,15 @@ namespace jsonrpc {
             myId(std::move(id)) {
         }
 
+        Response(int32_t faultCode, std::string faultString, Value id, Value data) : Response(faultCode, faultString, std::move(id)) {
+            myFaultData = std::move(data);
+        }
+
         void Write(Writer& writer) const {
             writer.StartDocument();
             if (myIsFault) {
                 writer.StartFaultResponse(myId);
-                writer.WriteFault(myFaultCode, myFaultString);
+                writer.WriteFault(myFaultCode, myFaultString, myFaultData);
                 writer.EndFaultResponse();
             } else {
                 writer.StartResponse(myId);
@@ -41,7 +45,7 @@ namespace jsonrpc {
             writer.EndDocument();
         }
 
-        Value& GetResult() { return myResult; }
+        const Value& GetResult() const { return myResult; }
         bool IsFault() const { return myIsFault; }
 
         void ThrowIfFault() const {
@@ -79,6 +83,10 @@ namespace jsonrpc {
             throw Fault(myFaultString, myFaultCode);
         }
 
+        const Value& GetFaultData() const {
+            return myFaultData;
+        }
+
         const Value& GetId() const { return myId; }
 
     private:
@@ -87,6 +95,7 @@ namespace jsonrpc {
         int32_t myFaultCode;
         std::string myFaultString;
         Value myId;
+        Value myFaultData;
     };
 
 } // namespace jsonrpc

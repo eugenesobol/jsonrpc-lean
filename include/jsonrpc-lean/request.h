@@ -16,9 +16,11 @@ namespace jsonrpc {
 
     class Writer;
 
-    class Request {
+    class Request
+    {
     public:
         typedef std::deque<Value> Parameters;
+        using NamedParams = std::deque<std::string>;
 
         Request(std::string methodName, Parameters parameters, Value id)
             : myMethodName(std::move(methodName)),
@@ -38,11 +40,43 @@ namespace jsonrpc {
         static void Write(const std::string& methodName, const Parameters& params, const Value& id, Writer& writer) {
             writer.StartDocument();
             writer.StartRequest(methodName, id);
+            writer.StartArray();
             for (auto& param : params) {
                 writer.StartParameter();
                 param.Write(writer);
                 writer.EndParameter();
             }
+            writer.EndArray();
+            writer.EndRequest();
+            writer.EndDocument();
+        }
+
+        // quick and crappy way to implement parameters in JSON object
+        static void Write(const std::string& methodName,
+                      const Parameters&  params,
+                      const Value&       id,
+                      Writer&            writer,
+                      const NamedParams& namedParams)
+        {
+
+            if (namedParams.size() != params.size())
+            {
+                throw std::runtime_error("Arrays of parameter values and names must have equal size");
+            }
+
+            writer.StartDocument();
+            writer.StartRequest(methodName, id);
+            writer.StartStruct();
+
+            std::size_t index = 0;
+            for (const auto& paramName : namedParams)
+            {
+                writer.StartStructElement(paramName);
+                params[index++].Write(writer);
+                writer.EndStructElement();
+            }
+
+            writer.EndStruct();
             writer.EndRequest();
             writer.EndDocument();
         }

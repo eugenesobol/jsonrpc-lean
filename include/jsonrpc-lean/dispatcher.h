@@ -51,6 +51,16 @@ namespace jsonrpc {
             return *this;
         }
 
+        void SetNamedParams(const NamedParams& namedParams)
+        {
+            this->namedParams = namedParams;
+        }
+
+        const NamedParams& GetNamedParams() const
+        {
+            return namedParams;
+        }
+
         const std::vector<std::vector<Value::Type>>&
             GetSignatures() const { return mySignatures; }
 
@@ -63,6 +73,7 @@ namespace jsonrpc {
         bool myIsHidden = false;
         std::string myHelpText;
         std::vector<std::vector<Value::Type>> mySignatures;
+        NamedParams namedParams;
     };
 
     template<typename> struct ToStdFunction;
@@ -112,6 +123,11 @@ namespace jsonrpc {
         }
 
         MethodWrapper& GetMethod(const std::string& name) {
+            return myMethods.at(name);
+        }
+
+        const MethodWrapper& GetMethod(const std::string& name) const
+        {
             return myMethods.at(name);
         }
 
@@ -177,9 +193,18 @@ namespace jsonrpc {
             catch (const Fault& fault) {
                 return Response(fault.GetCode(), fault.GetString(), Value(id));
             }
+            catch (const UserFault& ex) {
+                return Response(ex.getFaultCode(), ex.what(), Value(id), ex.getFaultData());
+            }
             catch (const std::out_of_range&) {
                 InvalidParametersFault fault;
                 return Response(fault.GetCode(), fault.GetString(), Value(id));
+            }
+            catch (const Poco::Exception& ex) {
+                return Response(0,
+                            ex.displayText() + "; errno: " + strerror(errno) + " ("
+                              + std::to_string(errno) + ")",
+                            Value(id));
             }
             catch (const std::exception& ex) {
                 return Response(0, ex.what(), Value(id));

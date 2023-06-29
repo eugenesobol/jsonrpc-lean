@@ -17,6 +17,8 @@ struct tm;
 
 namespace {
 
+    const char DATE_TIME_FORMAT[] = "%Y-%m-%dT%H:%M:%S%z";
+
     constexpr char BASE_64_ALPHABET[64 + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     constexpr int8_t BASE_64_LUT[256] = {
@@ -59,6 +61,43 @@ namespace {
 
 namespace jsonrpc {
     namespace util {
+
+        inline std::string FormatIso8601DateTime(const tm& dt)
+        {
+            char str[128];
+            return std::string(str, strftime(str, sizeof(str), DATE_TIME_FORMAT, &dt));
+        }
+
+        inline bool ParseIso8601DateTime(const char* text, tm& dt)
+        {
+            if (!text)
+            {
+                return false;
+            }
+            memset(&dt, 0, sizeof(dt));
+            // FIXME it does not fail on string "5000" but fails on "0"
+            // Hack: Use sscanf() to prove that date can be parsed
+            // UPDATE: It turned out that std::get_time and std::put_time manipulators are missing in
+            // gcc 4.9
+
+            int   year, month, day, hour, min;
+            float sec;
+            auto  scanned = sscanf(text, "%d-%d-%dT%d:%d:%fZ", &year, &month, &day, &hour, &min, &sec);
+
+            if (scanned < 6)
+            {
+                return false;
+            }
+
+            dt.tm_sec   = sec;
+            dt.tm_min   = min;
+            dt.tm_hour  = hour;
+            dt.tm_mday  = day;
+            dt.tm_mon   = month - 1; // Assuming your month represents Jan with 1
+            dt.tm_year  = year - 1900;
+            dt.tm_isdst = -1;
+            return true;
+        }
 
         inline std::string Base64Encode(const std::string& data); // forward declaration
 

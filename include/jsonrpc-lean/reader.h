@@ -7,6 +7,10 @@
 #ifndef JSONRPC_LEAN_READER_H
 #define JSONRPC_LEAN_READER_H
 
+#include <functional>
+#include <string>
+#include <vector>
+
 namespace jsonrpc {
 
     class Request;
@@ -15,6 +19,9 @@ namespace jsonrpc {
 
     class Reader {
     public:
+        using NamedParams        = std::vector<std::string>;
+        using GetNamedParamsFunc = std::function<const NamedParams&(const std::string& methodName)>;
+
         virtual ~Reader() {}
 
         virtual Request GetRequest() = 0;

@@ -36,6 +36,11 @@ namespace jsonrpc {
 
         ~Client() {}
 
+        void SetMyId(int32_t id)
+        {
+            myId = id;
+        }
+
         std::shared_ptr<FormattedData> BuildRequestData(const std::string& methodName, const Request::Parameters& params = {}) {
             return BuildRequestDataInternal(methodName, params);
         }
@@ -78,10 +83,17 @@ namespace jsonrpc {
             return BuildRequestDataInternal(methodName, params, std::forward<RestTypes>(rest)...);
         }
 
-        std::shared_ptr<FormattedData> BuildRequestDataInternal(const std::string& methodName, const Request::Parameters& params) {
+        std::shared_ptr<FormattedData> BuildRequestDataInternal(const std::string& methodName, const Request::Parameters& params, const Request::NamedParams& namedParams = {}) {
             auto writer = myFormatHandler.CreateWriter();
-            const auto id = myId++;
-            Request::Write(methodName, params, id, *writer);
+            const auto id = myId;
+            if (namedParams.empty())
+            {
+                Request::Write(methodName, params, id, *writer);
+            }
+            else
+            {
+                Request::Write(methodName, params, id, *writer, namedParams);
+            }
             return writer->GetData();
         }
 
@@ -91,9 +103,16 @@ namespace jsonrpc {
             return BuildNotificationDataInternal(methodName, params, std::forward<RestTypes>(rest)...);
         }
 
-        std::shared_ptr<FormattedData> BuildNotificationDataInternal(const std::string& methodName, const Request::Parameters& params) {
+        std::shared_ptr<FormattedData> BuildNotificationDataInternal(const std::string& methodName, const Request::Parameters& params, const Request::NamedParams& namedParams = {}) {
             auto writer = myFormatHandler.CreateWriter();
-            Request::Write(methodName, params, false, *writer);
+            if (namedParams.empty())
+            {
+                Request::Write(methodName, params, false, *writer);
+            }
+            else
+            {
+                Request::Write(methodName, params, false, *writer, namedParams);
+            }
             return writer->GetData();
         }
 

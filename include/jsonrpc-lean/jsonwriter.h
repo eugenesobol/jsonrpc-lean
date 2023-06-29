@@ -95,7 +95,7 @@ namespace jsonrpc {
             myRequestData->Writer.EndObject();
         }
 
-        void WriteFault(int32_t code, const std::string& string) override {
+        void WriteFault(int32_t code, const std::string& string, const Value& data) override {
             myRequestData->Writer.Key(json::ERROR_NAME, sizeof(json::ERROR_NAME) - 1);
             myRequestData->Writer.StartObject();
 
@@ -104,6 +104,12 @@ namespace jsonrpc {
 
             myRequestData->Writer.Key(json::ERROR_MESSAGE_NAME, sizeof(json::ERROR_MESSAGE_NAME) - 1);
             myRequestData->Writer.String(string.data(), string.size(), true);
+
+            if (!data.IsNil())
+            {
+                myRequestData->Writer.Key(json::ERROR_DATA_NAME, sizeof(json::ERROR_DATA_NAME) - 1);
+                data.Write(*this);
+            }
 
             myRequestData->Writer.EndObject();
         }
@@ -158,6 +164,11 @@ namespace jsonrpc {
 
         void Write(const std::string& value) override {
             myRequestData->Writer.String(value.data(), value.size(), true);
+        }
+
+        void Write(const tm& value) override
+        {
+            Write(util::FormatIso8601DateTime(value));
         }
 
     private:

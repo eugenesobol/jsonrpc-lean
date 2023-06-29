@@ -22,7 +22,8 @@ namespace jsonrpc {
         virtual bool CanHandleRequest(const std::string& contentType) = 0;
         virtual std::string GetContentType() = 0;
         virtual bool UsesId() = 0;
-        virtual std::unique_ptr<Reader> CreateReader(const std::string& data) = 0;
+        virtual std::unique_ptr<Reader> CreateReader(const std::string& data,
+                                                    Reader::GetNamedParamsFunc func) = 0;
         virtual std::unique_ptr<Writer> CreateWriter() = 0;
     };
 

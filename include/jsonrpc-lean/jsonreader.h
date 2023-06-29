@@ -14,6 +14,7 @@
 #include "response.h"
 #include "util.h"
 #include "value.h"
+#include "dispatcher.h"
 
 #define RAPIDJSON_NO_SIZETYPEDEFINE
 namespace rapidjson { typedef ::std::size_t SizeType; }
@@ -25,7 +26,9 @@ namespace jsonrpc {
 
     class JsonReader final : public Reader {
     public:
-        JsonReader(const std::string& data) {
+        JsonReader(const std::string& data, GetNamedParamsFunc func)
+        : getNamedParamsFunc(func)
+        {
             myDocument.Parse(data.c_str());
             if (myDocument.HasParseError()) {
                 throw ParseErrorFault(
@@ -33,10 +36,52 @@ namespace jsonrpc {
             }
         }
 
-        // Reader
-        Request GetRequest() override {
+        void parseObjectParams(Request::Parameters&              parameters,
+                            const rapidjson::Value&           paramsNode,
+                            const MethodWrapper::NamedParams& namedParams)
+        {
+            //            if (namedParams.empty()) {
+            //                throw InternalErrorFault();
+            //            }
+
+            auto paramsObj = paramsNode.GetObject();
+
+            // iterate over named parameter names in the order they
+            // must be passed to a handler of JSON-RPC method
+            for (const auto& namedParam : namedParams)
+            {
+
+                auto param = paramsObj.FindMember(namedParam.c_str());
+
+                // named parameter was not found
+                if (param == paramsObj.MemberEnd())
+                {
+                    parameters.emplace_back(Value());
+                }
+                else
+                {
+                    parameters.emplace_back(GetValue(param->value));
+                }
+            }
+        }
+
+            // Reader
+        Request GetRequest(Value& idOnFault) override {
             if (!myDocument.IsObject()) {
                 throw InvalidRequestFault();
+            }
+
+            auto id      = myDocument.FindMember(json::ID_NAME);
+            auto idFound = id != myDocument.MemberEnd();
+            if (idFound)
+            {
+                try
+                {
+                    idOnFault = GetId(id->value);
+                }
+                catch (...)
+                {
+                }
             }
 
             ValidateJsonrpcVersion();
@@ -49,24 +94,44 @@ namespace jsonrpc {
             Request::Parameters parameters;
             auto params = myDocument.FindMember(json::PARAMS_NAME);
             if (params != myDocument.MemberEnd()) {
-                if (!params->value.IsArray()) {
-                    throw InvalidRequestFault();
-                }
 
-                for (auto param = params->value.Begin(); param != params->value.End();
-                    ++param) {
-                    parameters.emplace_back(GetValue(*param));
+                if (params->value.IsArray()) {
+                    for (auto param = params->value.Begin(); param != params->value.End(); ++param) {
+                        parameters.emplace_back(GetValue(*param));
+                    }
+                } else if (params->value.IsObject()) {
+                    try
+                    {
+
+                        if (!this->getNamedParamsFunc)
+                        {
+                            throw std::runtime_error("NULL callback for named params");
+                        }
+
+                        const auto& namedParams = this->getNamedParamsFunc(method->value.GetString());
+                        parseObjectParams(parameters, params->value, namedParams);
+                    }
+                    catch (const std::out_of_range&)
+                    {
+                        throw MethodNotFoundFault();
+                    }
+                    catch (const std::exception& exc)
+                    {
+                        throw InternalErrorFault(exc.what());
+                    }
+                }
+                else
+                {
+                    throw InvalidRequestFault();
                 }
             }
 
-            auto id = myDocument.FindMember(json::ID_NAME);
-            if (id == myDocument.MemberEnd()) {
+            if (idFound) {
+                return Request(method->value.GetString(), std::move(parameters), GetId(id->value));
+            } else {
                 // Notification
                 return Request(method->value.GetString(), std::move(parameters), false);
             }
-
-            return Request(method->value.GetString(), std::move(parameters),
-                GetId(id->value));
         }
 
         Response GetResponse() override {
@@ -105,8 +170,15 @@ namespace jsonrpc {
                     throw InvalidRequestFault();
                 }
 
-                return Response(code->value.GetInt(), message->value.GetString(),
-                    GetId(id->value));
+                auto data = error->value.FindMember(json::ERROR_DATA_NAME);
+                if (data == error->value.MemberEnd()) {
+                    return Response(code->value.GetInt(), message->value.GetString(), GetId(id->value));
+                } else {
+                    return Response(code->value.GetInt(),
+                                    message->value.GetString(),
+                                    GetId(id->value),
+                                    GetValue(data->value));
+                }
             } else {
                 throw InvalidRequestFault();
             }
@@ -150,6 +222,12 @@ namespace jsonrpc {
                 return Value(std::move(array));
             }
             case rapidjson::kStringType: {
+                tm dt;
+                if (util::ParseIso8601DateTime(value.GetString(), dt))
+                {
+                    return Value(dt);
+                }
+
                 std::string str(value.GetString(), value.GetStringLength());
                 const bool binary = str.find('\0') != std::string::npos;
                 return Value(std::move(str), binary);
@@ -189,6 +267,7 @@ namespace jsonrpc {
 
         std::string myData;
         rapidjson::Document myDocument;
+        GetNamedParamsFunc  getNamedParamsFunc;
     };
 
 } // namespace jsonrpc
